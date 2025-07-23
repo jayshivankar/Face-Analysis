@@ -54,10 +54,6 @@ st.markdown("---")
 if st.session_state["captured_image"] is not None:
     if st.button("🧾 Generate Report"):
         st.success("✅ Image captured and ready for analysis.")
-        # You can now pass this to your backend pipeline
-        # For example:
-        # from analysis_pipeline import process_image
-        # report = process_image(st.session_state["captured_image"])
-        # st.markdown(report)
+        #
 else:
     st.info("📌 Please upload or capture a face image to begin.")
