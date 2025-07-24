@@ -163,4 +163,4 @@ cython_debug/
 .idea/
 
 # Ignore dataset folder
-age_prediction/
+datasets/
