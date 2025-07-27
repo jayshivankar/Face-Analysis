@@ -56,4 +56,4 @@ if st.session_state["captured_image"] is not None:
         st.success("✅ Image captured and ready for analysis.")
         #
 else:
-    st.info("📌 Please upload or capture a face image to begin.")
+    st.info("📌 Please upload or capture a face image to begin right.")
