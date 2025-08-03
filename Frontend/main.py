@@ -1,30 +1,31 @@
 # main.py
 
+# app.py (main UI logic)
 import streamlit as st
 from streamlit_webrtc import webrtc_streamer, VideoProcessorBase, WebRtcMode
 import av
 import numpy as np
 from PIL import Image
+import facial_symmetry  # <-- import the analysis module
 
-st.set_page_config(page_title="🧠 Face Health Analyzer", layout="centered")
-st.title("🧠 Face Health Analyzer")
-st.caption("📷 Upload or capture your face to generate a health report.")
+st.set_page_config(page_title="💡 Face Health Analyzer", layout="centered")
+st.title("💡 Face Health Analyzer")
+st.caption("📷 Upload or capture your face to analyze facial symmetry and possible conditions.")
 
 # Session state to hold captured image
 if "captured_image" not in st.session_state:
     st.session_state["captured_image"] = None
 
-# ---- Option 1: Upload Image ----
-uploaded_file = st.file_uploader("📤 Upload a face image", type=["jpg", "jpeg", "png"])
+# ---- Upload Image ----
+uploaded_file = st.file_uploader("📄 Upload a face image", type=["jpg", "jpeg", "png"])
 if uploaded_file:
     image = Image.open(uploaded_file).convert("RGB")
     st.image(image, caption="🖼️ Uploaded Image", use_container_width=True)
     st.session_state["captured_image"] = np.array(image)
 
-# ---- Option 2: Webcam Capture ----
+# ---- Webcam Capture ----
 st.markdown("---")
 st.subheader("📷 Or capture from webcam")
-
 
 class CaptureProcessor(VideoProcessorBase):
     def __init__(self) -> None:
@@ -34,7 +35,6 @@ class CaptureProcessor(VideoProcessorBase):
         img = frame.to_ndarray(format="bgr24")
         self.frame = img
         return frame
-
 
 ctx = webrtc_streamer(
     key="capture",
@@ -52,8 +52,15 @@ if ctx.video_processor and st.button("📸 Capture Frame"):
 # ---- Generate Report ----
 st.markdown("---")
 if st.session_state["captured_image"] is not None:
-    if st.button("🧾 Generate Report"):
-        st.success("✅ Image captured and ready for analysis.")
-        #
+    if st.button("📟 Generate Report"):
+        image = st.session_state["captured_image"]
+        with st.spinner("🔄 Analyzing facial symmetry..."):
+            result = facial_symmetry.analyze_face_symmetry(image)
+
+        if result['symmetry_score'] is not None:
+            st.success(f"✅ Symmetry Score: {result['symmetry_score']:.2f} ({result['status']})")
+            st.markdown(f"**Possible Conditions:** {result['condition']}")
+        else:
+            st.error("❌ Could not detect face. Please try a clearer image.")
 else:
-    st.info("📌 Please upload or capture a face image to begin right.")
+    st.info("🔹 Please upload or capture a face image to start.")
