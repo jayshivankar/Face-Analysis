@@ -1,12 +1,11 @@
 # main.py
 
-# app.py (main UI logic)
 import streamlit as st
 from streamlit_webrtc import webrtc_streamer, VideoProcessorBase, WebRtcMode
 import av
 import numpy as np
 from PIL import Image
-import facial_symmetry  
+import facial_symmetry
 
 st.set_page_config(page_title="💡 Face Health Analyzer", layout="centered")
 st.title("💡 Face Health Analyzer")
