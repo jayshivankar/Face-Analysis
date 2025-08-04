@@ -68,13 +68,13 @@ def predict_condition(landmarks, w, h) -> str:
     brow_diff = abs((left_brow.y - right_brow.y) * h)
 
     if mouth_diff > 10 and brow_diff > 8:
-        return "⚠️ Possible Bell’s Palsy"
+        return "⚠️ Probable Signs of Bell’s Palsy"
     elif mouth_diff > 10 and brow_diff < 5:
-        return "⚠️ Possible Stroke"
+        return "⚠️ Probable signs of Stroke"
     elif brow_diff > 12:
         return "⚠️ Possible Congenital Jaw Defect"
     else:
-        return "⚠️ Facial Asymmetry Detected (Unclassified)"
+        return "⚠️ Facial Asymmetry Detected "
 
 
 def draw_landmarks(image: np.ndarray) -> np.ndarray:
