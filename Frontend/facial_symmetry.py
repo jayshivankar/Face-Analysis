@@ -14,7 +14,6 @@ MIDLINE_POINTS = [1, 168, 199]  # nose bridge, chin
 # Thresholds to determine asymmetry
 ASYMMETRY_THRESHOLD = 0.04  # Lower is more symmetric
 
-
 def analyze_symmetry(image: np.ndarray) -> dict:
     """
     Analyze facial asymmetry and predict possible conditions.

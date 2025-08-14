@@ -67,40 +67,40 @@ if skin_file:
     st.image(skin_img, caption="Uploaded Skin Area", use_container_width=True)
     st.session_state["skin_image"] = np.array(skin_img)
 
-# # --- Generate Report ---
-# st.markdown("---")
-# if st.session_state["captured_image"] is not None:
-#     if st.button("🧾 Generate Report"):
-#         face_image = st.session_state["captured_image"]
-#
-#         st.subheader("📊 Analysis Report")
-#         with st.spinner("Analyzing facial symmetry..."):
-#             result = analyze_symmetry(face_image)
-#             st.write(f"Facial Symmetry: {result}")
-#
-#         with st.spinner("Predicting age and gender..."):
-#             age, gender = predict_age_gender(face_image)
-#             st.write(f"Age: {age}", f"Gender: {gender}")
-#
-#         with st.spinner("Predicting fatigue..."):
-#             fatigue = predict_fatigue(face_image)
-#             st.write(f"Fatigue Status: {fatigue}")
-#
-#         # Handle skin image
-#         skin_input = st.session_state["skin_image"]
-#         if skin_input is None:
-#             with st.spinner("Trying to extract cheek region for skin analysis..."):
-#                 cheek_crop = extract_cheek_region(face_image)
-#                 if cheek_crop is not None:
-#                     skin_input = cheek_crop
-#                     st.image(skin_input, caption="Auto-extracted cheek region", use_container_width=True)
-#                 else:
-#                     st.warning("Could not auto-extract a valid skin region. Please upload a close-up.")
-#
-#         if skin_input is not None:
-#             with st.spinner("Running skin disease classifier..."):
-#                 disease = predict_skin_disease(skin_input)
-#                 st.success(f"Detected Skin Condition: {disease}")
-#
-# else:
-#     st.info("📌 Please upload or capture a face image to begin.")
+# --- Generate Report ---
+st.markdown("---")
+if st.session_state["captured_image"] is not None:
+    if st.button("🧾 Generate Report"):
+        face_image = st.session_state["captured_image"]
+
+        st.subheader("📊 Analysis Report")
+        with st.spinner("Predicting age and gender..."):
+            age, gender = predict_age_gender(face_image)
+            st.write(f"Age: {age}", f"Gender: {gender}")
+
+        with st.spinner("Analyzing facial symmetry..."):
+            result = analyze_symmetry(face_image)
+            st.write(f"Facial Symmetry: {result}")
+
+        with st.spinner("Predicting fatigue..."):
+            fatigue = predict_fatigue(face_image)
+            st.write(f"Fatigue Status: {fatigue}")
+
+        # Handle skin image
+        skin_input = st.session_state["skin_image"]
+        if skin_input is None:
+            with st.spinner("Trying to extract cheek region for skin analysis..."):
+                cheek_crop = extract_cheek_region(face_image)
+                if cheek_crop is not None:
+                    skin_input = cheek_crop
+                    st.image(skin_input, caption="Auto-extracted cheek region", use_container_width=True)
+                else:
+                    st.warning("Could not auto-extract a valid skin region. Please upload a close-up.")
+
+        if skin_input is not None:
+            with st.spinner("Running skin disease classifier..."):
+                disease = predict_skin_disease(skin_input)
+                st.success(f"Detected Skin Condition: {disease}")
+
+else:
+    st.info("📌 Please upload or capture a face image to begin.")
