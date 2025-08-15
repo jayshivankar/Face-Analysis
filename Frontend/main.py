@@ -8,11 +8,12 @@ import cv2
 import os
 
 # --- Internal imports ---
-# from facial_symmetry import analyze_symmetry
-# from age_gender_prediction import predict_age_gender
-# from fatigue_prediction import predict_fatigue
-# from skin_disease_classifier import predict_skin_disease
-# from utils import extract_cheek_region
+from facial_symmetry import analyze_symmetry
+from analyzers import predict_age_gender
+from analyzers import predict_fatigue
+from analyzers import predict_skin_disease
+from analyzers import extract_cheek_region
+
 
 st.set_page_config(page_title="🧠 Face Health Analyzer", layout="centered")
 st.title("🧠 Face Health Analyzer")
