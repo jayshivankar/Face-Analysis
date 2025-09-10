@@ -1,19 +1,13 @@
 import streamlit as st
-from streamlit_webrtc import webrtc_streamer, WebRtcMode, VideoProcessorBase
+from streamlit_webrtc import webrtc_streamer, VideoProcessorBase, WebRtcMode
 import av
-import numpy as np
 from PIL import Image
-import io
+import numpy as np
 import cv2
-import os
 
 # --- Internal imports ---
 from facial_symmetry import analyze_symmetry
-from analyzers import predict_age_gender
-from analyzers import predict_fatigue
-from analyzers import predict_skin_disease
-from analyzers import extract_cheek_region
-
+from analyzers import predict_age_gender, predict_fatigue, predict_skin_disease
 
 st.set_page_config(page_title="🧠 Face Health Analyzer", layout="centered")
 st.title("🧠 Face Health Analyzer")
@@ -25,7 +19,7 @@ if "captured_image" not in st.session_state:
 if "skin_image" not in st.session_state:
     st.session_state["skin_image"] = None
 
-# --- Upload image ---
+# --- Upload face image ---
 st.subheader("🖼️ Upload a face image")
 uploaded_file = st.file_uploader("Upload a frontal face image", type=["jpg", "jpeg", "png"])
 if uploaded_file:
@@ -77,31 +71,24 @@ if st.session_state["captured_image"] is not None:
         st.subheader("📊 Analysis Report")
         with st.spinner("Predicting age and gender..."):
             age, gender = predict_age_gender(face_image)
-            st.write(f"Age: {age}", f"Gender: {gender}")
+            st.write(f"**Age:** {age} | **Gender:** {gender}")
 
         with st.spinner("Analyzing facial symmetry..."):
             result = analyze_symmetry(face_image)
-            st.write(f"Facial Symmetry: {result}")
+            st.write(f"**Facial Symmetry:** {result}")
 
         with st.spinner("Predicting fatigue..."):
             fatigue = predict_fatigue(face_image)
-            st.write(f"Fatigue Status: {fatigue}")
+            st.write(f"**Fatigue Status:** {fatigue}")
 
-        # Handle skin image
+        # Skin analysis
         skin_input = st.session_state["skin_image"]
-        if skin_input is None:
-            with st.spinner("Trying to extract cheek region for skin analysis..."):
-                cheek_crop = extract_cheek_region(face_image)
-                if cheek_crop is not None:
-                    skin_input = cheek_crop
-                    st.image(skin_input, caption="Auto-extracted cheek region", use_container_width=True)
-                else:
-                    st.warning("Could not auto-extract a valid skin region. Please upload a close-up.")
-
         if skin_input is not None:
             with st.spinner("Running skin disease classifier..."):
                 disease = predict_skin_disease(skin_input)
-                st.success(f"Detected Skin Condition: {disease}")
+                st.success(f"Detected Skin Condition: **{disease}**")
+        else:
+            st.warning("No skin image provided. Skin analysis skipped.")
 
 else:
     st.info("📌 Please upload or capture a face image to begin.")
