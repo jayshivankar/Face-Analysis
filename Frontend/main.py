@@ -19,6 +19,8 @@ if "captured_image" not in st.session_state:
     st.session_state["captured_image"] = None
 if "skin_image" not in st.session_state:
     st.session_state["skin_image"] = None
+if "last_report" not in st.session_state:
+    st.session_state["last_report"] = None
 
 # --- Upload face image ---
 st.subheader("🖼️ Upload a face image")
@@ -79,7 +81,11 @@ if st.session_state["captured_image"] is not None:
         # Symmetry
         with st.spinner("Analyzing facial symmetry..."):
             symmetry = analyze_symmetry(face_image)
-        st.info(f"🔄 **Facial Symmetry:** {symmetry}")
+        if "error" in symmetry:
+            st.error(symmetry["error"])
+        else:
+            st.info(f"🔄 **Asymmetry Score:** {symmetry['asymmetry_score']}")
+            st.write(f"🧾 **Condition:** {symmetry['predicted_condition']}")
 
         # Fatigue
         with st.spinner("Predicting fatigue..."):
@@ -99,21 +105,29 @@ if st.session_state["captured_image"] is not None:
             else:
                 st.warning(f"⚠️ **Detected Skin Condition:** {disease}")
         else:
+            disease = "Not analyzed"
             st.info("No skin image provided. Skin analysis skipped.")
 
-else:
-    st.info("📌 Please upload or capture a face image to begin.")
+        # Save report to session
+        st.session_state["last_report"] = {
+            "age": age,
+            "gender": gender,
+            "symmetry": symmetry,
+            "fatigue": fatigue,
+            "disease": disease,
+        }
 
-
-if st.button("⬇️ Download Report"):
+# --- Download Report ---
+if st.session_state["last_report"] is not None:
+    report_data = st.session_state["last_report"]
     report = f"""
-    Face Health Report
-    -----------------
-    Age: {age}
-    Gender: {gender}
-    Symmetry Score: {result.get('asymmetry_score', 'N/A')}
-    Condition: {result.get('predicted_condition', 'N/A')}
-    Fatigue: {fatigue}
-    Skin Condition: {disease if skin_input is not None else 'Not analyzed'}
-    """
-    st.download_button("Download as TXT", report, file_name="face_report.txt")
+Face Health Report
+-----------------
+Age: {report_data['age']}
+Gender: {report_data['gender']}
+Symmetry Score: {report_data['symmetry'].get('asymmetry_score', 'N/A')}
+Condition: {report_data['symmetry'].get('predicted_condition', 'N/A')}
+Fatigue: {report_data['fatigue']}
+Skin Condition: {report_data['disease']}
+"""
+    st.download_button("⬇️ Download Report", report, file_name="face_report.txt")
