@@ -3,19 +3,22 @@ import numpy as np
 from tensorflow.keras.models import load_model
 from skin_model_fixer import safe_skin_predict
 
-# Load models safely
-def try_load(path):
+# --- Load models with safe fallbacks ---
+def load_safe_model(path):
     try:
-        return load_model(path)
+        model = load_model(path)
+        print(f"✅ Loaded model: {path}")
+        return model
     except Exception as e:
-        print(f"[Model Load Error] {path}: {e}")
+        print(f"⚠️ Could not load {path}: {e}")
         return None
 
-age_model = try_load("saved_models/age_model.keras")
-gender_model = try_load("saved_models/gender_model.keras")
-fatigue_model = try_load("saved_models/best_fatigue_model.keras")
-skin_model = try_load("saved_models/mobilenet_skin.keras")
+age_model = load_safe_model("saved_models/age_model.keras")
+gender_model = load_safe_model("saved_models/gender_model.keras")
+fatigue_model = load_safe_model("saved_models/best_fatigue_model.keras")
+skin_model = load_safe_model("saved_models/mobilenet_skin.keras")
 
+# --- Labels ---
 gender_labels = ["Male", "Female"]
 skin_labels = [
     "Acne",
@@ -27,50 +30,79 @@ skin_labels = [
     "Seborrheic Keratoses",
     "Squamous Cell Carcinoma",
     "Vascular Lesion",
-    "normal",
+    "normal"
 ]
 
 # --- Age & Gender ---
 def predict_age_gender(image):
     age_pred, gender_label = 30, "Unknown"
     try:
-        img = cv2.resize(image, (224, 224)) / 255.0
-        img = np.expand_dims(img, axis=0)
+        # Default resize
+        target_size = (224, 224)
+        img_resized = cv2.resize(image, target_size) / 255.0
 
+        # --- Age prediction ---
         if age_model:
-            age_pred = age_model.predict(img, verbose=0)[0][0]
+            if len(age_model.input_shape) == 2:  # expects flat input
+                flat = img_resized.flatten().reshape(1, -1)
+                age_pred = age_model.predict(flat, verbose=0)[0][0]
+            else:  # CNN input
+                img_expanded = np.expand_dims(img_resized, axis=0)
+                age_pred = age_model.predict(img_expanded, verbose=0)[0][0]
 
+        # --- Gender prediction ---
         if gender_model:
-            gender_pred = gender_model.predict(img, verbose=0)
+            if len(gender_model.input_shape) == 2:  # expects flat input
+                flat = img_resized.flatten().reshape(1, -1)
+                gender_pred = gender_model.predict(flat, verbose=0)
+            else:
+                img_expanded = np.expand_dims(img_resized, axis=0)
+                gender_pred = gender_model.predict(img_expanded, verbose=0)
+
             gender_label = gender_labels[np.argmax(gender_pred)]
+
     except Exception as e:
-        print(f"[Age/Gender Error] {e}")
+        print(f"[Age/Gender Prediction Error] {e}")
+
     return int(age_pred), gender_label
+
 
 # --- Fatigue ---
 def predict_fatigue(image):
-    if not fatigue_model:
+    if fatigue_model is None:
         return "Fatigue analysis unavailable"
+
     try:
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) if image.ndim == 3 else image
-        img = cv2.resize(gray, (96, 96)) / 255.0
-        if len(fatigue_model.input_shape) == 2:
-            pred = fatigue_model.predict(img.flatten().reshape(1, -1), verbose=0)
+        # Convert to grayscale if needed
+        if len(image.shape) == 3 and image.shape[2] == 3:
+            gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         else:
-            pred = fatigue_model.predict(np.expand_dims(img, (0, -1)), verbose=0)
+            gray = image
+
+        img_resized = cv2.resize(gray, (96, 96)) / 255.0
+
+        if len(fatigue_model.input_shape) == 2:  # Flattened input
+            flattened = img_resized.flatten().reshape(1, -1)
+            pred = fatigue_model.predict(flattened, verbose=0)
+        else:  # CNN input
+            img_expanded = np.expand_dims(img_resized, axis=(0, -1))
+            pred = fatigue_model.predict(img_expanded, verbose=0)
+
         return "Fatigued" if pred[0][0] > 0.5 else "Not Fatigued"
     except Exception as e:
         return f"Fatigue analysis error: {e}"
 
 # --- Skin Disease ---
 def predict_skin_disease(image):
-    if not skin_model:
+    if skin_model is None:
         return "Skin analysis unavailable"
+
     try:
-        img = cv2.resize(image, (224, 224)) / 255.0
-        img = np.expand_dims(img, axis=0)
-        pred = safe_skin_predict(skin_model, img)
-        return skin_labels[int(np.argmax(pred))]
+        img_resized = cv2.resize(image, (224, 224)) / 255.0
+        img_expanded = np.expand_dims(img_resized, axis=0)
+
+        pred = safe_skin_predict(skin_model, img_expanded)
+        label = skin_labels[np.argmax(pred)]
+        return label
     except Exception as e:
         return f"Skin analysis error: {e}"
-
