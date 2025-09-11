@@ -103,3 +103,17 @@ if st.session_state["captured_image"] is not None:
 
 else:
     st.info("📌 Please upload or capture a face image to begin.")
+
+
+if st.button("⬇️ Download Report"):
+    report = f"""
+    Face Health Report
+    -----------------
+    Age: {age}
+    Gender: {gender}
+    Symmetry Score: {result.get('asymmetry_score', 'N/A')}
+    Condition: {result.get('predicted_condition', 'N/A')}
+    Fatigue: {fatigue}
+    Skin Condition: {disease if skin_input is not None else 'Not analyzed'}
+    """
+    st.download_button("Download as TXT", report, file_name="face_report.txt")
