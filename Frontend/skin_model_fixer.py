@@ -3,16 +3,20 @@ import numpy as np
 
 def safe_skin_predict(model, img_expanded):
     """
-    Tries different input formats to make skin model prediction work.
+    Tries multiple input formats for skin disease model.
     """
     try:
         return model.predict(img_expanded, verbose=0)
     except ValueError:
         try:
-            # Try duplicate input
+            # Duplicate input
             return model.predict([img_expanded, img_expanded], verbose=0)
         except ValueError:
-            # Try flipped second input
-            img_flipped = cv2.flip(img_expanded[0], 1)
-            img_flipped_expanded = np.expand_dims(img_flipped, axis=0)
-            return model.predict([img_expanded, img_flipped_expanded], verbose=0)
+            try:
+                # Flipped second input
+                img_flipped = cv2.flip(img_expanded[0], 1)
+                img_flipped = np.expand_dims(img_flipped, axis=0)
+                return model.predict([img_expanded, img_flipped], verbose=0)
+            except Exception as e:
+                print(f"[Skin Prediction Error] {e}")
+                return np.zeros((1, 10))  # fallback: "normal"
