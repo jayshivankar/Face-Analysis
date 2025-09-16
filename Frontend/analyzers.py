@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 from tensorflow.keras.models import load_model
 from skin_model_fixer import safe_skin_predict
+from PIL import Image
 
 # --- Load models safely ---
 def load_safe_model(path):
@@ -34,29 +35,54 @@ skin_labels = [
 ]
 
 # --- Age & Gender ---
+
+# --- Age & Gender ---
 def predict_age_gender(image):
     """
-    Predicts age (regression) and gender (binary classification).
-    - Both models trained on 200x200 RGB input.
+    Predicts age (int) and gender (Male/Female) from a face image (numpy array).
     """
-    age_pred, gender_label = 30, "Unknown"
+    if age_model is None or gender_model is None:
+        return 30, "Unknown"
+
     try:
-        img_resized = cv2.resize(image, (200, 200)) / 255.0
-        img_expanded = np.expand_dims(img_resized, axis=0)
+        # Convert NumPy -> PIL for consistent preprocessing
+        im = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB)).convert("RGB")
 
-        # Age prediction
-        if age_model:
-            age_pred = age_model.predict(img_expanded, verbose=0)[0][0]
+        # Center square crop
+        width, height = im.size
+        if width != height:
+            if width > height:
+                left = (width - height) / 2
+                right = left + height
+                im = im.crop((left, 0, right, height))
+            else:
+                top = (height - width) / 2
+                bottom = top + width
+                im = im.crop((0, top, width, bottom))
 
-        # Gender prediction
-        if gender_model:
-            gender_pred = gender_model.predict(img_expanded, verbose=0)
-            gender_label = gender_labels[int(gender_pred[0][0] > 0.5)]
+        # Resize to model input
+        im_resized = im.resize((224, 224), Image.Resampling.LANCZOS)
+
+        # Prepare for model
+        ar = np.asarray(im_resized).astype("float32") / 255.0
+        ar = np.expand_dims(ar, axis=0)
+
+        # Age
+        age_pred = int(age_model.predict(ar, verbose=0)[0][0])
+
+        # Gender
+        gender_pred = gender_model.predict(ar, verbose=0)[0]
+        if gender_pred.shape[0] == 1:  # sigmoid
+            gender = "Male" if np.round(gender_pred[0]) == 0 else "Female"
+        else:  # softmax
+            gender = gender_labels[np.argmax(gender_pred)]
+
+        return age_pred, gender
 
     except Exception as e:
         print(f"[Age/Gender Prediction Error] {e}")
+        return 30, "Unknown"
 
-    return int(age_pred), gender_label
 
 
 # --- Fatigue ---
