@@ -6,29 +6,45 @@ from skin_model_fixer import safe_skin_predict
 from PIL import Image
 import os
 
+# Get the correct base directory
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+SAVED_MODELS_PATH = os.path.join(BASE_DIR, "..", "saved_models")  # Go up one level from Frontend to Face_Analysis
+
 
 # --- Load models safely ---
-def load_safe_model(path, compile=True):
-    try:
-        # Check if model file exists
-        if not os.path.exists(path):
-            print(f"❌ Model file not found: {path}")
+def load_safe_model(model_filename, compile=True):
+    """
+    Safely load a model from the correct saved_models directory
+    """
+    model_path = os.path.join(SAVED_MODELS_PATH, model_filename)
+
+    # Check if file exists
+    if not os.path.exists(model_path):
+        print(f"❌ Model file not found: {model_path}")
+        # Try alternative path without Frontend
+        alt_path = os.path.join(BASE_DIR, "..", "..", "saved_models", model_filename)
+        if os.path.exists(alt_path):
+            print(f"✅ Found model at alternative path: {alt_path}")
+            model_path = alt_path
+        else:
+            print(f"❌ Model also not found at alternative path: {alt_path}")
             return None
 
-        model = load_model(path, compile=compile)
-        print(f"✅ Loaded model: {path} | Inputs: {model.input_shape}")
+    try:
+        model = load_model(model_path, compile=compile)
+        print(f"✅ Loaded model: {model_path}")
         return model
     except Exception as e:
-        print(f"⚠️ Could not load {path}: {e}")
+        print(f"⚠️ Could not load {model_path}: {e}")
         return None
 
 
-# Load models with absolute paths to avoid relative path issues
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-age_model = load_safe_model(os.path.join(BASE_DIR, "saved_models", "age_model.keras"))
-gender_model = load_safe_model(os.path.join(BASE_DIR, "saved_models", "gender_model.keras"))
-fatigue_model = load_safe_model(os.path.join(BASE_DIR, "saved_models", "best_fatigue_model.keras"))
-skin_model = load_safe_model(os.path.join(BASE_DIR, "saved_models", "mobilenet_skin.keras"), compile=False)
+# Load models
+age_model = load_safe_model("age_model.keras")
+gender_model = load_safe_model("gender_model.keras")
+fatigue_model = load_safe_model("best_fatigue_model.keras")
+skin_model = load_safe_model("mobilenet_skin.keras", compile=False)
+
 
 # --- Labels ---
 gender_labels = ["Male", "Female"]
