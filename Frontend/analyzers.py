@@ -5,14 +5,19 @@ from tensorflow.keras.models import load_model
 from skin_model_fixer import safe_skin_predict
 from PIL import Image
 import os
+import logging
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Get the correct base directory
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-SAVED_MODELS_PATH = os.path.join(BASE_DIR, "..", "saved_models")  # Go up one level from Frontend to Face_Analysis
+SAVED_MODELS_PATH = os.path.join(BASE_DIR, "..", "saved_models")
 
 
 # --- Load models safely ---
-def load_safe_model(model_filename, compile=True):
+def load_safe_model(model_filename, compile=False):
     """
     Safely load a model from the correct saved_models directory
     """
@@ -20,31 +25,31 @@ def load_safe_model(model_filename, compile=True):
 
     # Check if file exists
     if not os.path.exists(model_path):
-        print(f"❌ Model file not found: {model_path}")
+        logger.error(f"Model file not found: {model_path}")
         # Try alternative path without Frontend
         alt_path = os.path.join(BASE_DIR, "..", "..", "saved_models", model_filename)
         if os.path.exists(alt_path):
-            print(f"✅ Found model at alternative path: {alt_path}")
+            logger.info(f"Found model at alternative path: {alt_path}")
             model_path = alt_path
         else:
-            print(f"❌ Model also not found at alternative path: {alt_path}")
+            logger.error(f"Model also not found at alternative path: {alt_path}")
             return None
 
     try:
+        # Load model with compile=False to avoid optimizer issues
         model = load_model(model_path, compile=compile)
-        print(f"✅ Loaded model: {model_path}")
+        logger.info(f"Loaded model: {model_path}")
         return model
     except Exception as e:
-        print(f"⚠️ Could not load {model_path}: {e}")
+        logger.error(f"Could not load {model_path}: {e}")
         return None
 
 
-# Load models
-age_model = load_safe_model("age_model.keras")
-gender_model = load_safe_model("gender_model.keras")
-fatigue_model = load_safe_model("best_fatigue_model.keras")
+# Load models with correct paths and settings
+age_model = load_safe_model("age_model.keras", compile=True)
+gender_model = load_safe_model("gender_model.keras", compile=True)
+fatigue_model = load_safe_model("best_fatigue_model.keras", compile=True)
 skin_model = load_safe_model("mobilenet_skin.keras", compile=False)
-
 
 # --- Labels ---
 gender_labels = ["Male", "Female"]
@@ -67,25 +72,35 @@ def detect_face(image):
     """
     Detect face in image using Haar Cascade
     """
-    face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    faces = face_cascade.detectMultiScale(gray, 1.3, 5)
+    try:
+        face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+        if face_cascade.empty():
+            logger.warning("Haar cascade classifier not loaded properly")
+            return image
 
-    if len(faces) == 0:
-        return None
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        faces = face_cascade.detectMultiScale(gray, 1.1, 4)
 
-    # Return the largest face
-    faces = sorted(faces, key=lambda x: x[2] * x[3], reverse=True)
-    x, y, w, h = faces[0]
+        if len(faces) == 0:
+            logger.info("No face detected, using entire image")
+            return image
 
-    # Expand the face region a bit
-    padding = 20
-    x = max(0, x - padding)
-    y = max(0, y - padding)
-    w = min(image.shape[1] - x, w + 2 * padding)
-    h = min(image.shape[0] - y, h + 2 * padding)
+        # Return the largest face
+        faces = sorted(faces, key=lambda x: x[2] * x[3], reverse=True)
+        x, y, w, h = faces[0]
 
-    return image[y:y + h, x:x + w]
+        # Expand the face region a bit
+        padding = 20
+        x = max(0, x - padding)
+        y = max(0, y - padding)
+        w = min(image.shape[1] - x, w + 2 * padding)
+        h = min(image.shape[0] - y, h + 2 * padding)
+
+        return image[y:y + h, x:x + w]
+
+    except Exception as e:
+        logger.error(f"Error in face detection: {e}")
+        return image
 
 
 # --- Age & Gender ---
@@ -94,48 +109,38 @@ def predict_age_gender(image):
     Predicts age (int) and gender (Male/Female) from a face image (numpy array).
     """
     if age_model is None or gender_model is None:
+        logger.error("Age or gender model not loaded")
         return 30, "Unknown"
 
     try:
         # First try to detect and crop face
         face_image = detect_face(image)
-        if face_image is None:
-            face_image = image  # Use the whole image if no face detected
 
         # Convert to PIL for consistent preprocessing
         im = Image.fromarray(cv2.cvtColor(face_image, cv2.COLOR_BGR2RGB)).convert("RGB")
 
-        # Center square crop
-        width, height = im.size
-        if width != height:
-            size = min(width, height)
-            left = (width - size) / 2
-            top = (height - size) / 2
-            right = (width + size) / 2
-            bottom = (height + size) / 2
-            im = im.crop((left, top, right, bottom))
-
-        # Resize to model input
+        # Resize to a standard size (assuming models expect 224x224)
         im_resized = im.resize((224, 224), Image.Resampling.LANCZOS)
 
-        # Prepare for model
+        # Prepare for model - normalize to [0, 1]
         ar = np.asarray(im_resized).astype("float32") / 255.0
         ar = np.expand_dims(ar, axis=0)
 
         # Age prediction
-        age_pred = int(age_model.predict(ar, verbose=0)[0][0])
+        age_pred = age_model.predict(ar, verbose=0)
+        age_pred = int(age_pred[0][0])
 
         # Gender prediction
         gender_pred = gender_model.predict(ar, verbose=0)[0]
-        if gender_pred.shape[0] == 1:  # sigmoid
+        if gender_pred.shape[0] == 1:  # sigmoid output
             gender = "Male" if np.round(gender_pred[0]) == 0 else "Female"
-        else:  # softmax
+        else:  # softmax output
             gender = gender_labels[np.argmax(gender_pred)]
 
         return age_pred, gender
 
     except Exception as e:
-        print(f"[Age/Gender Prediction Error] {e}")
+        logger.error(f"Age/Gender Prediction Error: {e}")
         return 30, "Unknown"
 
 
@@ -146,13 +151,12 @@ def predict_fatigue(image):
     - Model trained on 100x100 grayscale input with 2-class softmax.
     """
     if fatigue_model is None:
+        logger.error("Fatigue model not loaded")
         return "Fatigue analysis unavailable"
 
     try:
         # Try to detect and crop face first
         face_image = detect_face(image)
-        if face_image is None:
-            face_image = image
 
         gray = cv2.cvtColor(face_image, cv2.COLOR_BGR2GRAY)
         img_resized = cv2.resize(gray, (100, 100)) / 255.0
@@ -168,6 +172,7 @@ def predict_fatigue(image):
             return f"Not Fatigued ({confidence:.1%} confidence)"
 
     except Exception as e:
+        logger.error(f"Fatigue analysis error: {e}")
         return f"Fatigue analysis error: {e}"
 
 
@@ -175,18 +180,25 @@ def predict_fatigue(image):
 def predict_skin_disease(image):
     """
     Predicts skin condition from close-up images.
-    - Handles both single-input and two-input MobileNet models.
     - Uses safe_skin_predict wrapper.
     """
     if skin_model is None:
+        logger.error("Skin model not loaded")
         return "Skin analysis unavailable"
 
     try:
         img_resized = cv2.resize(image, (224, 224)) / 255.0
         img_expanded = np.expand_dims(img_resized, axis=0)
 
+        # Use the safe prediction method
         pred = safe_skin_predict(skin_model, img_expanded)
-        label = skin_labels[np.argmax(pred)]
+
+        # Handle different prediction formats
+        if isinstance(pred, list):
+            pred = pred[0]
+
+        label_idx = np.argmax(pred)
+        label = skin_labels[label_idx] if label_idx < len(skin_labels) else "Unknown"
         confidence = float(np.max(pred)) * 100
 
         if confidence < 50:
@@ -197,4 +209,18 @@ def predict_skin_disease(image):
             return f"Possible {label} ({confidence:.1f}%) - Consult a dermatologist"
 
     except Exception as e:
+        logger.error(f"Skin analysis error: {e}")
         return f"Skin analysis error: {e}"
+
+
+# --- Model Status Check ---
+def get_model_status():
+    """
+    Returns the status of all models for display in the UI
+    """
+    return {
+        "age_model": age_model is not None,
+        "gender_model": gender_model is not None,
+        "fatigue_model": fatigue_model is not None,
+        "skin_model": skin_model is not None
+    }
