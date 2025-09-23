@@ -1,0 +1,17 @@
+# Core dependencies with compatible versions
+numpy==1.24.3
+protobuf==4.25.3
+opencv-python==4.8.1.78
+pillow==10.2.0
+
+# MediaPipe and TensorFlow with compatible versions
+mediapipe==0.10.14
+tensorflow==2.13.0
+keras==2.13.1
+
+# Streamlit and web framework
+streamlit==1.28.0
+
+# Additional utilities
+matplotlib==3.7.2
+scipy==1.11.3

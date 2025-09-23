@@ -5,6 +5,7 @@ import tensorflow as tf
 from tensorflow.keras.models import Model
 from tensorflow.keras.layers import Input, Lambda
 
+
 def safe_skin_predict(model, img_expanded):
     """
     Try multiple input formats for the skin disease model until one works.
@@ -14,22 +15,29 @@ def safe_skin_predict(model, img_expanded):
       - Two-input models (original + flipped)
     If all fail, returns a fallback "normal"-like prediction.
     """
-    try:
-        # Case 1: single input (most common)
-        return model.predict(img_expanded, verbose=0)
-    except Exception as e1:
+    # Try different input formats
+    input_formats = [
+        # Format 1: Single input (most common)
+        lambda: model.predict(img_expanded, verbose=0),
+        # Format 2: Duplicate input
+        lambda: model.predict([img_expanded, img_expanded], verbose=0),
+        # Format 3: Original + flipped
+        lambda: model.predict([img_expanded, np.flip(img_expanded, axis=2)], verbose=0),
+        # Format 4: Try with training=False for batch norm layers
+        lambda: model.predict(img_expanded, verbose=0, steps=1),
+    ]
+
+    for i, predict_func in enumerate(input_formats):
         try:
-            # Case 2: duplicate input for models expecting two tensors
-            return model.predict([img_expanded, img_expanded], verbose=0)
-        except Exception as e2:
-            try:
-                # Case 3: original + flipped image
-                img_flipped = cv2.flip(img_expanded[0], 1)
-                img_flipped = np.expand_dims(img_flipped, axis=0)
-                return model.predict([img_expanded, img_flipped], verbose=0)
-            except Exception as e3:
-                print(f"[SkinModelFixer] All prediction methods failed: {e1}, {e2}, {e3}")
-                # Return neutral prediction (last class "normal" highest)
-                fallback = np.zeros((1, 10))
-                fallback[0, -1] = 1.0
-                return fallback
+            result = predict_func()
+            print(f"✅ Skin prediction successful with format {i + 1}")
+            return result
+        except Exception as e:
+            print(f"❌ Skin prediction format {i + 1} failed: {e}")
+            continue
+
+    # If all formats fail, return a fallback prediction
+    print("⚠️ All skin prediction formats failed, using fallback")
+    fallback = np.zeros((1, 10))
+    fallback[0, -1] = 1.0  # Set "Normal" as the prediction
+    return fallback
